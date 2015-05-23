@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map.Entry;
+import java.util.Random;
+import java.util.Set;
 
 public class G { //adjacency list
 	private int id;
@@ -32,16 +34,26 @@ public class G { //adjacency list
 	
 	public boolean isEdgeExist(int from, int to)
 	{
-		E e = new E(to);
+		E e = new E(from, to);
 		if(this.graphList.containsKey(from))
 			if(this.graphList.get(from).contains(e))
 				return true;
 		return false;
 	}
 	
+	public HashSet<E> getNbrs(int u)
+	{
+		if(!this.graphList.containsKey(u))
+		{
+			//System.out.println(u+" do not exist");
+			return new HashSet<E>();
+		}
+		return this.graphList.get(u);
+	}
+	
 	public void addEdge(int u, int v)
 	{
-		E e = new E(v);
+		E e = new E(u, v);
 		HashSet<E> edge = new HashSet<E>();
 		edge.add(e);
 		if(!this.graphList.containsKey(u)) //u not exist => add u, v 
@@ -67,13 +79,10 @@ public class G { //adjacency list
 	{
 		if(this.status)
 			return this.status;
-		else
+		else if(this.checkGraph())
 		{
-			if(this.checkGraph())
-			{
-				this.status = true;
-				return this.status;
-			}
+			this.status = true;
+			return this.status;
 		}
 		return false;
 	}
@@ -81,7 +90,7 @@ public class G { //adjacency list
 	{
 		for(Entry<Integer, HashSet<E>> entry : this.graphList.entrySet())
 		{
-			for(E e : entry.getValue())
+			for(E e : entry.getValue()) //check whether all edges are regular setting
 			{
 				if(!e.getStatus())
 					return false;
@@ -112,6 +121,96 @@ public class G { //adjacency list
 		}
 	}
 	
+	public void setUniProb() //set tri-value probabilities
+	{
+		for(HashSet<E> Set : this.graphList.values())
+		{
+			for(E e : Set)
+				e.setProb(1/(double)Set.size());
+		}
+	}
+	
+	public void setTrivProb() //set tri-value probabilities
+	{
+		Random r = new Random();
+		double[] ds = new double[3];
+		ds[0] = 0.1; ds[1] = 0.01; ds[2] = 0.001;
+		for(HashSet<E> Set : this.graphList.values())
+		{
+			for(E e : Set)
+				e.setProb(ds[Math.abs(r.nextInt()%3)]);
+		}
+	}
+	
+	public boolean testTrivalue()
+	{
+		int v01 = 0, v001 = 0, v0001 = 0;
+		for(HashSet<E> Set : this.graphList.values())
+			for(E edge : Set)
+			{
+				if(edge.getProb() == 0.1)
+					v01++;
+				else if(edge.getProb() == 0.01)
+					v001++;
+				else if(edge.getProb() == 0.001)
+					v0001++;
+				else
+					return false;
+			}
+		System.out.println("# 0.1: "+v01);
+		System.out.println("# 0.01: "+v001);
+		System.out.println("# 0.001: "+v0001);
+		return true;
+	}
+	
+	public boolean testUnivalue()
+	{
+		int n1 = 0, n2 = 0, n3 = 0;
+		for(HashSet<E> Set : this.graphList.values())
+			for(E edge : Set)
+			{
+				if(edge.getProb() < 0.25)
+					n1++;
+				else if(edge.getProb() < 0.5)
+					n2++;
+				else if(edge.getProb() <= 1)
+					n3++;
+				else
+					return false;
+			}
+		System.out.println("# p < 0.25: "+n1);
+		System.out.println("# 0.25 <= p < 0.5: "+n2);
+		System.out.println("# 0.5 <= p < 1: "+n3);
+		return true;
+	}
+	public Set<Integer> getKey()
+	{
+		return this.graphList.keySet();
+	}
+	
+	public E getEdge(int u, int v)
+	{
+		E e = new E(u,v);
+		for(E edge : this.graphList.get(u))
+		{
+			if(edge.equals(e))
+				return e;
+		}
+		e.setProb(0.0);
+		return e;
+	}
+	
+	public Set<E> getEdgesOf(int nodeV)
+	{
+		Set<E> edges = new HashSet<E>();
+		if(this.graphList.containsKey(nodeV))
+			edges.addAll(this.graphList.get(nodeV));
+		if(this.inedges.containsKey(nodeV))
+			for(int u : this.inedges.get(nodeV))
+				edges.addAll(this.graphList.get(u));
+		return edges;
+	}
+	
 	public void show()
 	{
 		for(int i : this.graphList.keySet())
@@ -125,10 +224,10 @@ public class G { //adjacency list
 	
 	public boolean testSet()
 	{
-		E e1 = new E(1);
-		E e2 = new E(0);
-		E e3 = new E(1);
-		E e4 = new E(2);
+		E e1 = new E(0,1);
+		E e2 = new E(1,0);
+		E e3 = new E(0,1);
+		E e4 = new E(1,2);
 		HashSet<E> set = new HashSet<E>();
 		set.add(e1);
 		set.add(e2);
@@ -142,15 +241,14 @@ public class G { //adjacency list
 	}
 	public boolean testGraph()
 	{
-		G g = new G();
-		g.addEdge(0, 1);
-		g.addEdge(2, 3);
-		g.addEdge(1, 3);
-		g.addEdge(2, 3);
-		g.addEdge(3, 1);
-		if(g.inedges.get(1).size() == 2 && g.inedges.get(3).size() == 2)
+		this.addEdge(0, 1);
+		this.addEdge(2, 3);
+		this.addEdge(1, 3);
+		this.addEdge(2, 3);
+		this.addEdge(3, 1);
+		if(this.inedges.get(1).size() == 2 && this.inedges.get(3).size() == 2)
 			
-		if(g.isEdgeExist(3, 1) && g.isEdgeExist(1, 3) && g.isEdgeExist(0, 1) && g.isEdgeExist(2, 3) && !g.isEdgeExist(3, 2))
+		if(this.isEdgeExist(3, 1) && this.isEdgeExist(1, 3) && this.isEdgeExist(0, 1) && this.isEdgeExist(2, 3) && !this.isEdgeExist(3, 2))
 			return true;
 		return false;
 	}
@@ -160,9 +258,36 @@ public class G { //adjacency list
 			return true;
 		return false;
 	}
+	public void testProb()
+	{
+		this.addEdge(0, 1);
+		this.addEdge(2, 3);
+		this.addEdge(1, 3);
+		this.addEdge(2, 3);
+		this.addEdge(3, 1);
+		for(Entry<Integer, HashSet<E>> e : this.graphList.entrySet())
+		{
+			for(E edge : e.getValue())
+				if(this.getEdgesOf(3).contains(edge))
+					edge.setProb(0.1);
+				else
+					edge.setProb(0.2);
+		}
+		/*
+		for(Entry<Integer, HashSet<E>> e : this.graphList.entrySet())
+		{
+			for(E edge : e.getValue())
+				System.out.println(edge.getProb());
+		}
+		*/
+	}
 	public static void main(String[] args) throws IOException
 	{
-		System.out.println(new G().testAll());
+		G g = new G();
+		g.testProb();
+		//System.out.println(new G().testAll());
+		g.setTrivProb();
+		g.testTrivalue();
 		
 	}
 }
