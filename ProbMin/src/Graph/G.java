@@ -11,14 +11,14 @@ import java.util.Random;
 import java.util.Set;
 
 public class G { //adjacency list
-	private int id;
+	private int id = -1;
 	private Hashtable<Integer, HashSet<E>> graphList //out edges -> use to traversal
 		= new Hashtable<Integer, HashSet<E>>();
 	private Hashtable<Integer, HashSet<Integer>> inedges = new Hashtable<Integer, HashSet<Integer>>();
 	private Hashtable<Integer, Boolean> activeTable = new Hashtable<Integer, Boolean>();
 	private boolean status = false;
 	
-	protected void initialActive()
+	protected void initialActive() // all nodes are inactive initially
 	{
 		for(int key : this.graphList.keySet())
 		{
@@ -41,17 +41,16 @@ public class G { //adjacency list
 		return false;
 	}
 	
-	public HashSet<E> getNbrs(int u)
+	public HashSet<E> getNbrs(int u) // neighbors of u
 	{
 		if(!this.graphList.containsKey(u))
 		{
-			//System.out.println(u+" do not exist");
 			return new HashSet<E>();
 		}
 		return this.graphList.get(u);
 	}
 	
-	public void addEdge(int u, int v)
+	public void addEdge(int u, int v) // add edge (u, v)
 	{
 		E e = new E(u, v);
 		HashSet<E> edge = new HashSet<E>();
@@ -64,7 +63,7 @@ public class G { //adjacency list
 		{
 			this.graphList.get(u).add(e);
 		}
-		if(this.inedges.containsKey(v)) // revise edge
+		if(this.inedges.containsKey(v)) // opposite edge
 			//if(this.inedges.get(v).contains(u))
 			this.inedges.get(v).add(u);
 		else
@@ -86,6 +85,7 @@ public class G { //adjacency list
 		}
 		return false;
 	}
+	
 	public boolean checkGraph()
 	{
 		for(Entry<Integer, HashSet<E>> entry : this.graphList.entrySet())
@@ -126,7 +126,7 @@ public class G { //adjacency list
 		for(HashSet<E> Set : this.graphList.values())
 		{
 			for(E e : Set)
-				e.setProb(1/(double)Set.size());
+				e.setProb(1/(double)this.inedges.get(e.idv()).size());
 		}
 	}
 	

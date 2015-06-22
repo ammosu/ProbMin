@@ -5,7 +5,9 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map.Entry;
 import java.util.Random;
 
 public class InfGraph {
@@ -13,11 +15,16 @@ public class InfGraph {
 	private String networkPath = "C:/Users/userpc/workspace/SocExp/Brightkite_edges.txt"; // Brightkite_edges.txt com-dblp.ungraph-small.txt
 	private String probabilityPath = "C:/Users/userpc/workspace/SocExp/prop_dblp_8020";
 	private HashSet<Integer> seeds = new HashSet<Integer>();
-	private int blockSize = 10;
-	private int mcIteration = 1000; // default
-	private int eta = 80;
+	private ArrayList<Integer> blockNodes = new ArrayList<Integer>();
+	private int blockSize = 20;
+	private int mcIteration = 10; // default
+	private int eta = 16;
 	private double error = 0.05;
 	
+	public G getInfG()
+	{
+		return this.infGraph;
+	}
 	public void setEta(int Eta)
 	{
 		this.eta = Eta;
@@ -129,11 +136,30 @@ public class InfGraph {
 	{
 		if(this.seeds.size() != 0)
 		{
+			//System.out.println("Seed is set already");
+			this.seeds.clear();
+			this.seeds = seed;
+			return false;
+		}
+		else
+			this.seeds = seed;
+		//System.out.println("Seed: "+seed);
+		return true;
+	}
+	
+	public boolean setSeed(String s)
+	{
+		HashSet<Integer> seed = new HashSet<Integer>();
+		for(String ss : s.split(", "))
+			seed.add(Integer.parseInt(ss));
+		if(this.seeds.size() != 0)
+		{
 			System.out.println("Seed is set already");
 			return false;
 		}
 		else
 			this.seeds = seed;
+		System.out.println("Seed: "+seed);
 		return true;
 	}
 	
@@ -189,10 +215,10 @@ public class InfGraph {
 		HashSet<Integer> s0 = new HashSet<Integer>();
 		HashSet<Integer> s1 = new HashSet<Integer>();
 		s1.addAll(this.seeds);
+		traversal.addAll(s1);
 		
 		while(s1.size() != 0) // new activate node size
 		{
-			traversal.addAll(s1);
 			if(traversal.size()>=this.eta) // check
 				return false;
 			s0.clear();
@@ -202,12 +228,15 @@ public class InfGraph {
 			{
 				for(E nbr : this.infGraph.getNbrs(s0Element))
 				{
-					if(!traversal.contains(nbr.idv()) && !s1.contains(nbr.idv()) && nbr.getProb()>Math.random())
+					if(!traversal.contains(nbr.idv()) && nbr.getProb()>Math.random())
+					{
 						s1.add(nbr.idv());
+						traversal.add(nbr.idv());
+					}
 				}
 			}
 		}
-		if(traversal.size()<this.eta)
+		if((double)traversal.size()*(1+this.error)<(double)this.eta)
 			return true;
 		else
 			return false;
@@ -304,12 +333,13 @@ public class InfGraph {
 		System.out.println(count);
 	}
 	
-	public void greedy()
+	public ArrayList<E> greedy()
 	{
 		double maxProb = -1.0;
 		int maxEdgeU = -1;
 		int maxEdgeV = -1;
 		ArrayList<E> blockEdges = new ArrayList<E>();
+		System.out.println("Original Probability: "+ this.probOfLessThanEta());
 		
 		while(blockEdges.size() < this.blockSize)
 		{
@@ -345,15 +375,18 @@ public class InfGraph {
 			maxEdgeU = -1;
 			maxEdgeV = -1;
 		}
+		return blockEdges;
 	}
 	
-	public void greedyNode()
+	public ArrayList<Integer> greedyNode()
 	{
+		int count = 0;
 		double maxProb = -1.0;
 		int maxNodeID = -1;
-		ArrayList<Integer> blockNodes = new ArrayList<Integer>();
+		double lastMax = -1.0;
 		double startTime, endTime, totalTime;
 
+		System.out.println("Original Probability: "+ this.probOfLessThanEta());
 		startTime = System.currentTimeMillis();
 		
 		while(blockNodes.size() < this.blockSize)// k block nodes
@@ -362,7 +395,8 @@ public class InfGraph {
 			{
 				if(this.seeds.contains(u))
 					continue;
-				System.out.print(".");
+				if(count++%100==0)
+					System.out.print(".");
 				for(E edge : this.infGraph.getEdgesOf(u)) // in-edge and out-edge
 				{
 					edge.block();
@@ -378,6 +412,10 @@ public class InfGraph {
 					edge.unblock();;
 				}
 			}
+			if(maxProb == 0.0||maxProb<=lastMax||this.blockNodes.contains(maxNodeID))
+			{
+				maxNodeID = this.nbrFirst();
+			}
 			for(E edge : this.infGraph.getEdgesOf(maxNodeID)) // block maxNode
 			{
 				edge.block();
@@ -390,12 +428,95 @@ public class InfGraph {
 			maxNodeID = -1;
 			maxProb = -1.0;
 		}
-		
 
 		endTime = System.currentTimeMillis();
 		totalTime = endTime - startTime;
 		System.out.println("Execution Time: " + totalTime/1000+" sec");
 		System.out.println(blockNodes);
+		
+		return blockNodes;
+	}
+	public void testBlock()
+	{
+		int count = 0;
+		for(int u : this.infGraph.getKey())// for each node
+		{
+			count ++;
+			for(E e: this.infGraph.getEdgesOf(u))
+			{
+				e.block();
+			}
+			this.probOfLessThanEta();
+			for(E e: this.infGraph.getEdgesOf(u))
+			{
+				e.unblock();
+			}
+			if(count == 500)
+				break;
+		}
+	}
+	
+	public void evalExp(ArrayList<Integer> B)
+	{
+		this.mcIteration = 100000;
+		for(int u : B)
+			for(E e:this.infGraph.getEdgesOf(u))
+				e.unblock();
+		for(int u : B)
+		{
+			for(E e:this.infGraph.getEdgesOf(u))
+			{
+				e.block();
+			}
+			System.out.println(this.probOfLessThanEta()+",");
+		}
+	}
+	
+	public int degreeFirst()
+	{
+		int maxDegree = 0;
+		int maxID = -1;
+		for(int id:this.infGraph.getKey())
+		{
+			if(this.blockNodes.contains(id))
+				continue;
+			int degree = this.infGraph.getNbrs(id).size();
+			if(degree > maxDegree)
+			{
+				maxDegree = degree;
+				maxID = id;
+			}
+		}
+		return maxID;
+	}
+	
+	public int nbrFirst()
+	{
+		HashMap<Integer, Double> idScore = new HashMap<Integer, Double>();
+		for(int u : this.seeds)
+		{
+			for(E seedNbr : this.infGraph.getNbrs(u))
+			{
+				if(this.blockNodes.contains(seedNbr.idv())||this.seeds.contains(seedNbr.idv()))
+					continue;
+				if(idScore.containsKey(seedNbr.idv()))
+				{
+					idScore.put(seedNbr.idv(), idScore.get(seedNbr.idv())+seedNbr.getProb());
+				}
+				else
+					idScore.put(seedNbr.idv(), seedNbr.getProb());
+			}	
+		}
+		double max = -1.0;
+		int maxID = -1;
+		for(Entry<Integer, Double> e : idScore.entrySet())
+			if(e.getValue() >= max)
+			{
+				maxID = e.getKey();
+				max = e.getValue();
+			}
+		//System.out.print("\nNBRFIRST: "+maxID+"\tP:"+max);
+		return maxID;
 	}
 	
 	public static void main(String[] args) throws IOException
@@ -404,24 +525,21 @@ public class InfGraph {
 		
 		InfGraph ifg = new InfGraph();
 		ifg.dataReading(2);//2: uni, 1: 8020, 0: tri 
-		System.out.println("Seed generate: "+ifg.randomSeedGenerate(5)+"\n--------------------------");
+		//System.out.println("Seed generate: "+ifg.randomSeedGenerate(20)+"\n--------------------------");
+		ifg.setSeed("40481, 353, 41636, 9156, 50341, 12710, 7179, 51595, 7435, 44587, 7313, 17425, 33170, 8274, 52468, 30677, 8248, 44606, 36222, 37887");
 		
 		ifg.info();
 		startTime = System.currentTimeMillis();
 		
 		//System.out.println("sigma: "+ ifg.sigma(100));
-		System.out.println("prob: "+ ifg.probOfLessThanEta());
-		//ifg.greedyNode();
+		//System.out.println("prob: "+ ifg.probOfLessThanEta());
+		ifg.greedyNode();
 		//ifg.propagateFastCheck();
+		//ifg.testBlock();
+		
 		endTime = System.currentTimeMillis();
 		totalTime = endTime - startTime;
 		System.out.println("Execution Time: " + totalTime/1000+" sec");
 
-		
-		//ifg.probTime(1000);
-		//System.out.println("Original influence: "+ifg.probOfLessThanEta());
-		//ifg.pSettingTest();
-		//ifg.greedyNode();
-		//ifg.greedy();
 	}
 }
